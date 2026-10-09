@@ -11,6 +11,8 @@ object Prefs {
     private fun p(ctx: Context) = ctx.getSharedPreferences("nova", Context.MODE_PRIVATE)
     fun aiKey(ctx: Context) = p(ctx).getString("ai_key", "") ?: ""
     fun setAiKey(ctx: Context, key: String) = p(ctx).edit().putString("ai_key", key).apply()
+    fun wakeEnabled(ctx: Context) = p(ctx).getBoolean("wake", false)
+    fun setWakeEnabled(ctx: Context, on: Boolean) = p(ctx).edit().putBoolean("wake", on).apply()
     fun aiModel(ctx: Context) = p(ctx).getString("ai_model", "gemini-2.5-flash") ?: "gemini-2.5-flash"
 }
 

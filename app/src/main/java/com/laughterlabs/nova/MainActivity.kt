@@ -3,6 +3,8 @@ package com.laughterlabs.nova
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -12,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.speech.RecognitionListener
+import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
@@ -28,8 +31,9 @@ import android.widget.TextView
 import java.util.Locale
 
 /**
- * Nova's face: a mic button, a chat log, and a text box.
- * Speech -> CommandEngine -> spoken reply.
+ * Nova's face. Works like Gemini:
+ *  - "Hey Nova" from anywhere (WakeWordService), or long-press power (default assistant)
+ *  - it listens straight away, answers, and keeps listening until you stop talking or say "bye".
  */
 class MainActivity : Activity() {
 
@@ -39,6 +43,8 @@ class MainActivity : Activity() {
     private lateinit var mic: Button
     private lateinit var input: EditText
     private lateinit var controlBtn: Button
+    private lateinit var wakeBtn: Button
+    private lateinit var assistantBtn: Button
 
     private lateinit var engine: CommandEngine
     private lateinit var tts: TextToSpeech
@@ -46,6 +52,14 @@ class MainActivity : Activity() {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var utteranceId = 0
+
+    /** True while we're in a back-and-forth conversation (Nova re-listens after each answer). */
+    private var inConversation = false
+    private var endAfterReply = false
+    private var foreground = false
+    private var pendingListen = false
+
+    private val bye = Regex("^(stop|bye|goodbye|good bye|that's all|thats all|that is all|nothing|no thanks|cancel|exit|close)\\b.*")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,24 +79,34 @@ class MainActivity : Activity() {
                 tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(id: String?) {}
                     @Deprecated("Deprecated in Java")
-                    override fun onError(id: String?) {}
-                    override fun onDone(id: String?) {
-                        // If Nova just asked "say yes to confirm", listen for the answer automatically.
-                        if (engine.awaitingConfirm) runOnUiThread { startListening() }
-                    }
+                    override fun onError(id: String?) { runOnUiThread { afterReply() } }
+                    override fun onDone(id: String?) { runOnUiThread { afterReply() } }
                 })
+                if (pendingListen) { pendingListen = false; startListening() }
             }
         }
 
         askPermissions()
         NovaNotification.show(this)
-        addLog("Nova", "Online. Tap the mic or type. Say \"help\" for what I can do.")
+        if (Prefs.wakeEnabled(this) && hasMic()) WakeWordService.start(this)
+        addLog("Nova", "Online. Say \"Hey Nova\", tap the mic, or type. Say \"help\" for what I can do.")
         handleIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        controlBtn.text = if (NovaAccessibilityService.instance != null) "Phone control: ON" else "Turn on phone control"
+        foreground = true
+        refreshButtons()
+    }
+
+    override fun onPause() {
+        foreground = false
+        super.onPause()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!listening) endConversation()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -93,22 +117,65 @@ class MainActivity : Activity() {
     private fun handleIntent(i: Intent?) {
         val wantsListen = i?.getBooleanExtra(EXTRA_LISTEN, false) == true ||
             i?.action == Intent.ACTION_ASSIST || i?.action == Intent.ACTION_VOICE_COMMAND
-        if (wantsListen) mic.postDelayed({ startListening() }, 250)
+        if (!wantsListen) return
+        i?.removeExtra(EXTRA_LISTEN)
+        inConversation = true
+        // Greet like a real assistant, then listen. If the voice isn't ready yet, just listen.
+        if (ttsReady) mic.postDelayed({ startListening() }, 200) else pendingListen = true
+    }
+
+    // ---------------- Conversation flow ----------------
+
+    /** Called when Nova finishes speaking. Decides whether to keep listening (like Gemini Live). */
+    private fun afterReply() {
+        when {
+            engine.awaitingConfirm -> startListening()
+            endAfterReply -> { endAfterReply = false; endConversation() }
+            inConversation && foreground -> startListening()
+            else -> endConversation()
+        }
+    }
+
+    private fun endConversation() {
+        inConversation = false
+        WakeWordService.conversationActive = false
+        WakeWordService.send(this, WakeWordService.ACTION_RESUME)
+        status.text = if (WakeWordService.running) "Say \"Hey Nova\" or tap the mic." else "Tap the mic and speak."
     }
 
     // ---------------- Voice ----------------
 
+    private fun hasMic() = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Use Google's speech engine explicitly. When Nova is the default assistant, Android points
+     * the "default recognizer" at Nova itself, so we must pick the real one by name.
+     */
+    private fun recognizerComponent(): ComponentName? {
+        val all = packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+            .map { ComponentName(it.serviceInfo.packageName, it.serviceInfo.name) }
+            .filter { it.packageName != packageName }
+        return all.firstOrNull { it.packageName == "com.google.android.googlequicksearchbox" }
+            ?: all.firstOrNull { it.packageName.startsWith("com.google") }
+            ?: all.firstOrNull()
+    }
+
     private fun startListening() {
         if (listening) return
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            askPermissions(); return
-        }
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+        if (!hasMic()) { askPermissions(); return }
+        val comp = recognizerComponent()
+        if (comp == null && !SpeechRecognizer.isRecognitionAvailable(this)) {
             speak("Speech recognition isn't available. Install or update the Google app.")
             return
         }
         if (ttsReady) tts.stop()
-        val rec = recognizer ?: SpeechRecognizer.createSpeechRecognizer(this).also { recognizer = it }
+        inConversation = true
+        // Free the microphone from the wake-word listener first.
+        WakeWordService.conversationActive = true
+        WakeWordService.send(this, WakeWordService.ACTION_PAUSE)
+
+        val rec = recognizer ?: (if (comp != null) SpeechRecognizer.createSpeechRecognizer(this, comp)
+        else SpeechRecognizer.createSpeechRecognizer(this)).also { recognizer = it }
         rec.setRecognitionListener(listener)
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -119,13 +186,14 @@ class MainActivity : Activity() {
         listening = true
         setMicActive(true)
         status.text = "Listening…"
-        rec.startListening(intent)
+        mic.postDelayed({ if (listening) rec.startListening(intent) }, if (WakeWordService.running) 250L else 0L)
     }
 
     private fun stopListening() {
-        recognizer?.stopListening()
+        recognizer?.cancel()
         listening = false
         setMicActive(false)
+        endConversation()
     }
 
     private val listener = object : RecognitionListener {
@@ -140,18 +208,24 @@ class MainActivity : Activity() {
         override fun onError(error: Int) {
             listening = false
             setMicActive(false)
-            status.text = when (error) {
-                SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Didn't catch that. Tap the mic."
-                SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network issue. Try again."
-                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission needed."
-                else -> "Tap the mic and speak."
+            when (error) {
+                // Silence = conversation over (Gemini does the same).
+                SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> endConversation()
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> mic.postDelayed({ startListening() }, 400)
+                SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> {
+                    endConversation(); status.text = "Network issue. Try again."
+                }
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                    endConversation(); status.text = "Microphone permission needed."
+                }
+                else -> endConversation()
             }
         }
         override fun onResults(results: Bundle?) {
             listening = false
             setMicActive(false)
             val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-            if (text.isNullOrBlank()) { status.text = "Didn't catch that."; return }
+            if (text.isNullOrBlank()) { endConversation(); return }
             onUserText(text)
         }
         override fun onPartialResults(partial: Bundle?) {
@@ -163,13 +237,19 @@ class MainActivity : Activity() {
 
     private fun onUserText(text: String) {
         addLog("You", text)
-        status.text = "Tap the mic and speak."
+        status.text = "Thinking…"
+        if (!engine.awaitingConfirm && bye.matches(text.lowercase(Locale.ROOT).trim())) {
+            endAfterReply = true
+            speak("Okay, I'm here if you need me.")
+            return
+        }
         engine.handle(text)
     }
 
     private fun speak(text: String) {
         addLog("Nova", text)
         if (ttsReady) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "u${utteranceId++}")
+        else afterReply()
     }
 
     // ---------------- UI ----------------
@@ -239,18 +319,58 @@ class MainActivity : Activity() {
         row.addView(Button(this).apply { text = "Send"; setOnClickListener { sendTyped() } })
         root.addView(row)
 
-        val tools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val half = { LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) }
+
+        val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        wakeBtn = Button(this).apply { setOnClickListener { toggleWake() } }
+        assistantBtn = Button(this).apply { setOnClickListener { openAssistantSettings() } }
+        row1.addView(wakeBtn, half())
+        row1.addView(assistantBtn, half())
+        root.addView(row1)
+
+        val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         controlBtn = Button(this).apply {
             setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         }
-        tools.addView(controlBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        tools.addView(Button(this).apply {
-            text = "AI brain"
-            setOnClickListener { showAiKeyDialog() }
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        root.addView(tools)
+        row2.addView(controlBtn, half())
+        row2.addView(Button(this).apply { text = "AI brain"; setOnClickListener { showAiKeyDialog() } }, half())
+        root.addView(row2)
 
         setContentView(root)
+    }
+
+    private fun refreshButtons() {
+        controlBtn.text = if (NovaAccessibilityService.instance != null) "Phone control: ON" else "Turn on phone control"
+        wakeBtn.text = if (Prefs.wakeEnabled(this)) "\"Hey Nova\": ON" else "\"Hey Nova\": OFF"
+        assistantBtn.text = if (isDefaultAssistant()) "Default assistant ✓" else "Make default assistant"
+    }
+
+    private fun toggleWake() {
+        val on = !Prefs.wakeEnabled(this)
+        if (on && !hasMic()) { askPermissions(); return }
+        Prefs.setWakeEnabled(this, on)
+        if (on) {
+            WakeWordService.start(this)
+            addLog("Nova", "Hands-free on. First time, I download a small offline voice model (about 36 MB), then just say \"Hey Nova\" from anywhere.")
+        } else {
+            WakeWordService.stop(this)
+            addLog("Nova", "Hands-free off.")
+        }
+        refreshButtons()
+    }
+
+    private fun isDefaultAssistant(): Boolean {
+        val cur = Settings.Secure.getString(contentResolver, "voice_interaction_service") ?: return false
+        return cur.startsWith("$packageName/")
+    }
+
+    private fun openAssistantSettings() {
+        addLog("Nova", "In the screen that opens choose: Default digital assistant app → Nova. Then long-press the power button (or swipe up from a bottom corner) to call me from any app.")
+        try {
+            startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+        } catch (e: ActivityNotFoundException) {
+            startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+        }
     }
 
     private fun sendTyped() {
@@ -298,6 +418,7 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, perms, results)
         NovaNotification.show(this)
+        if (Prefs.wakeEnabled(this) && hasMic()) WakeWordService.start(this)
     }
 
     override fun onDestroy() {
