@@ -13,6 +13,18 @@ android {
         targetSdk = 34
         versionCode = 2
         versionName = "0.2"
+        // Real phones only (drops emulator libraries, halves the APK size)
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+    }
+
+    // One fixed key, so every new build installs over the old one.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("nova-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
