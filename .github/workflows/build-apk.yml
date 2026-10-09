@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -27,3 +30,11 @@ jobs:
         with:
           name: Nova-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish APK as a release (direct phone download)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nova-latest
+          name: Nova (latest build)
+          make_latest: true
+          files: app/build/outputs/apk/debug/app-debug.apk
