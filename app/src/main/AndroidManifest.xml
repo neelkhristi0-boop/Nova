@@ -10,8 +10,9 @@
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- Lets Nova see and launch every installed app on Android 11+ -->
+    <!-- Lets Boba see and launch every installed app on Android 11+ -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -51,7 +52,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Gives Nova control of the whole phone: tap, type, scroll, back, home, screenshot -->
+        <!-- Gives Boba control of the whole phone: tap, type, scroll, back, home, screenshot -->
         <service
             android:name=".NovaAccessibilityService"
             android:exported="true"
@@ -65,13 +66,13 @@
                 android:resource="@xml/accessibility_config" />
         </service>
 
-        <!-- "Hey Nova" hands-free listener (offline) -->
+        <!-- "Hey Boba" hands-free listener (offline) -->
         <service
             android:name=".WakeWordService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- Lets Nova be chosen as the phone's default assistant, like Gemini -->
+        <!-- Lets Boba be chosen as the phone's default assistant, like Gemini -->
         <service
             android:name=".NovaVoiceInteractionService"
             android:exported="true"
@@ -100,7 +101,7 @@
                 android:resource="@xml/recognition_service" />
         </service>
 
-        <!-- Quick Settings tile: pull down the shade and tap "Nova" from any app -->
+        <!-- Quick Settings tile: pull down the shade and tap "Boba" from any app -->
         <service
             android:name=".NovaTileService"
             android:exported="true"

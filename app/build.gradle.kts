@@ -11,8 +11,8 @@ android {
         applicationId = "com.laughterlabs.nova"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
         // Real phones only (drops emulator libraries, halves the APK size)
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
@@ -42,7 +42,7 @@ android {
 }
 
 dependencies {
-    // Offline "Hey Nova" wake word
+    // Offline "Hey Boba" wake word
     implementation("com.alphacephei:vosk-android:0.3.47@aar")
     implementation("net.java.dev.jna:jna:5.13.0@aar")
 }

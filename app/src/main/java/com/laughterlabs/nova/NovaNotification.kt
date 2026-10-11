@@ -20,7 +20,7 @@ private fun listenPending(ctx: Context) = PendingIntent.getActivity(
     ctx, 7, listenIntent(ctx), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 )
 
-/** A pinned notification: pull down from any app, tap "Talk to Nova". */
+/** A pinned notification: pull down from any app, tap "Talk to Boba". */
 object NovaNotification {
     private const val CHANNEL = "nova"
 
@@ -29,10 +29,10 @@ object NovaNotification {
             ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
         val nm = ctx.getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Nova quick access", NotificationManager.IMPORTANCE_LOW))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Boba quick access", NotificationManager.IMPORTANCE_LOW))
         val n = Notification.Builder(ctx, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle("Nova is ready")
+            .setContentTitle("Boba is ready")
             .setContentText("Tap to talk")
             .setContentIntent(listenPending(ctx))
             .setOngoing(true)
@@ -41,10 +41,10 @@ object NovaNotification {
     }
 }
 
-/** Quick Settings tile: swipe down twice, tap Nova, start talking. */
+/** Quick Settings tile: swipe down twice, tap Boba, start talking. */
 class NovaTileService : TileService() {
     override fun onStartListening() {
-        qsTile?.apply { state = Tile.STATE_ACTIVE; label = "Nova"; updateTile() }
+        qsTile?.apply { state = Tile.STATE_ACTIVE; label = "Boba"; updateTile() }
     }
 
     override fun onClick() {

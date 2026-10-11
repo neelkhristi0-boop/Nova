@@ -9,8 +9,8 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
- * The "hands" of Nova. Once you switch it on in Settings > Accessibility,
- * Nova can see what's on screen and tap, type, scroll and navigate in ANY app.
+ * The "hands" of Boba. Once you switch it on in Settings > Accessibility,
+ * Boba can see what's on screen and tap, type, scroll and navigate in ANY app.
  */
 class NovaAccessibilityService : AccessibilityService() {
 
@@ -19,7 +19,7 @@ class NovaAccessibilityService : AccessibilityService() {
             private set
         @Volatile private var whatsappSendUntil = 0L
 
-        /** After Nova opens a WhatsApp chat with text filled in, press Send automatically for 10 seconds. */
+        /** After Boba opens a WhatsApp chat with text filled in, press Send automatically for 10 seconds. */
         fun armWhatsAppSend() { whatsappSendUntil = System.currentTimeMillis() + 10_000 }
     }
 

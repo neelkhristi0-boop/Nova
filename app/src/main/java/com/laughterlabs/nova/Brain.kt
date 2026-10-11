@@ -18,13 +18,13 @@ object Prefs {
 
 /**
  * Optional AI for open questions, explanations and code help.
- * No key = Nova still works fully for commands, and falls back to a Google search.
+ * No key = Boba still works fully for commands, and falls back to a Google search.
  */
 class Brain(private val ctx: Context) {
 
     private val history = ArrayDeque<JSONObject>()
 
-    private val persona = """You are Nova, a fast personal voice assistant on the user's Android phone.
+    private val persona = """You are Boba, a fast personal voice assistant on the user's Android phone.
 Answer in 1-3 short spoken sentences unless asked for detail. No markdown, no emojis.
 If asked for code, give it plainly and keep it short."""
 

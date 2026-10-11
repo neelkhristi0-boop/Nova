@@ -1,4 +1,4 @@
-# Nova — your Jarvis for Android (prototype v0.1)
+# Boba — your Jarvis for Android (prototype v0.1)
 
 Voice assistant that opens any app, calls and messages your contacts, plays music,
 searches, sets alarms, and controls the whole phone (tap, type, scroll, back, home,
@@ -8,26 +8,26 @@ An optional free AI key adds open questions and coding help.
 ## Get the APK — from your phone, no laptop (≈10 minutes)
 
 1. Make a free account at github.com (works in the phone browser).
-2. Create a new repository called `Nova`.
+2. Create a new repository called `Boba`.
 3. Tap **Add file → Upload files** and upload everything from this zip
    (keep the folders: `app/`, `.github/`, and the files at the top).
    Tip: the GitHub mobile site can't upload folders well — easiest is the
    **GitHub app** or "Desktop site" mode in Chrome.
-4. Open the **Actions** tab. "Build Nova APK" runs by itself (≈4 min).
-5. Open the finished run → **Artifacts → Nova-apk** → download, unzip, tap
+4. Open the **Actions** tab. "Build Boba APK" runs by itself (≈4 min).
+5. Open the finished run → **Artifacts → Boba-apk** → download, unzip, tap
    `app-debug.apk` → allow "install unknown apps" → Install.
 
-With a laptop instead: open the `Nova` folder in Android Studio → Run.
+With a laptop instead: open the `Boba` folder in Android Studio → Run.
 
 ## First-time setup on the phone (1 minute)
 
-1. Open Nova → allow Microphone, Phone, Contacts, SMS, Notifications.
-2. Tap **Turn on phone control** → Installed apps → Nova → On.
-   (This is what lets Nova tap Send in WhatsApp and control other apps.)
+1. Open Boba → allow Microphone, Phone, Contacts, SMS, Notifications.
+2. Tap **Turn on phone control** → Installed apps → Boba → On.
+   (This is what lets Boba tap Send in WhatsApp and control other apps.)
 3. Optional: **AI brain** → paste a free key from aistudio.google.com.
 4. Quick access from anywhere:
-   - Pull down notifications → tap **Nova is ready**, or
-   - Edit Quick Settings tiles → drag **Nova** in → one tap to talk.
+   - Pull down notifications → tap **Boba is ready**, or
+   - Edit Quick Settings tiles → drag **Boba** in → one tap to talk.
 
 ## Things to say
 
@@ -64,7 +64,7 @@ Anything else → AI brain (or Google search if no key).
 
 ## Roadmap (next upgrades)
 
-1. Always-on wake word "Hey Nova" (offline, Vosk/Porcupine) — no tapping at all
+1. Always-on wake word "Hey Boba" (offline, Vosk/Porcupine) — no tapping at all
 2. Hindi + Gujarati commands
 3. Read & reply to incoming WhatsApp/SMS by voice
 4. Multi-step tasks ("open Instagram and search CNC") via AI planning

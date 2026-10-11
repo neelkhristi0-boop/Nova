@@ -27,7 +27,7 @@ class CommandEngine(
     private var pending: (() -> String)? = null
     val awaitingConfirm get() = pending != null
 
-    private val wake = Regex("^(?:(?:hey|hi|ok|okay)\\s+)?(?:nova|jarvis)[\\s,!.]*")
+    private val wake = Regex("^(?:(?:hey|hi|ok|okay)\\s+)?(?:boba|bobba|booba|bubba|baba|bobo|bob a|jarvis)[\\s,!.]*")
     private val yes = Regex("^(yes|yeah|yep|yup|haan|ha|han|send|send it|confirm|do it|ok|okay|sure|go ahead)\\b.*")
 
     fun handle(raw: String) {
@@ -63,7 +63,7 @@ class CommandEngine(
         if (t.matches(Regex("help|what can you do.*|commands|show commands"))) return HELP
         if (t.matches(Regex("(hi|hello|hey)( there)?"))) return "Hello! What do you need?"
         if (t.matches(Regex("(thanks|thank you|thank you so much|great|nice|good job).*"))) return "Anytime."
-        if (t.matches(Regex("who are you|what('s| is) your name|introduce yourself"))) return "I'm Nova, your personal assistant. I can open apps, call, message, search, and control your phone."
+        if (t.matches(Regex("who are you|what('s| is) your name|introduce yourself"))) return "I'm Boba, your personal assistant. I can open apps, call, message, search, and control your phone."
         if (t.matches(Regex("(stop|shut up|be quiet|cancel)"))) return "Okay."
         if (Regex("\\b(what|tell)\\b.*\\btime\\b|^time( now)?$").containsMatchIn(t))
             return "It's " + SimpleDateFormat("h:mm a", Locale.ENGLISH).format(Date()) + "."
@@ -168,15 +168,15 @@ class CommandEngine(
     }
 
     /**
-     * Run a screen action through the accessibility service. Nova first steps aside
-     * so the action lands on the app you were using, not on Nova itself.
+     * Run a screen action through the accessibility service. Boba first steps aside
+     * so the action lands on the app you were using, not on Boba itself.
      * The block returns null on success, or a sentence to speak.
      */
     private fun screen(reply: String, hide: Boolean = true, block: (NovaAccessibilityService) -> String?): String {
         val svc = NovaAccessibilityService.instance
             ?: run {
                 Actions.openAccessibilitySettings(ctx)
-                throw NovaException("I need phone control for that. In the list that just opened, tap Nova and switch it on.")
+                throw NovaException("I need phone control for that. In the list that just opened, tap Boba and switch it on.")
             }
         if (hide) hideNova()
         main.postDelayed({

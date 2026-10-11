@@ -24,8 +24,8 @@ import java.net.URL
 import java.util.zip.ZipInputStream
 
 /**
- * Hands-free "Hey Nova". Runs a tiny offline speech model (Vosk) in the background, so nothing
- * is sent anywhere until you say the wake word. Then it hands the mic to Nova's main screen.
+ * Hands-free "Hey Boba". Runs a tiny offline speech model (Vosk) in the background, so nothing
+ * is sent anywhere until you say the wake word. Then it hands the mic to Boba's main screen.
  */
 class WakeWordService : Service(), RecognitionListener {
 
@@ -36,8 +36,8 @@ class WakeWordService : Service(), RecognitionListener {
         private const val NOTIF_ID = 2
         private const val MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip"
 
-        /** Wake words, including the ways the small model tends to hear "Nova". */
-        private val WAKE = Regex("\\b(nova|no va|novah|noa|jarvis|jarvi|jervis)\\b")
+        /** Wake words, including the ways the small model tends to hear "Boba". */
+        private val WAKE = Regex("\\b(boba|bobba|booba|bubba|bauba|bob a|bo ba|baba|bobo|jarvis|jarvi|jervis)\\b")
 
         @Volatile var running = false
             private set
@@ -68,7 +68,7 @@ class WakeWordService : Service(), RecognitionListener {
     override fun onCreate() {
         super.onCreate()
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Hey Nova listener", NotificationManager.IMPORTANCE_MIN))
+        nm.createNotificationChannel(NotificationChannel(CHANNEL, "Hey Boba listener", NotificationManager.IMPORTANCE_MIN))
         try {
             if (Build.VERSION.SDK_INT >= 29) {
                 startForeground(NOTIF_ID, notification("Starting…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
@@ -76,7 +76,7 @@ class WakeWordService : Service(), RecognitionListener {
                 startForeground(NOTIF_ID, notification("Starting…"))
             }
         } catch (e: Exception) {
-            // Android refuses to start a microphone service from the background; open Nova once to restart it.
+            // Android refuses to start a microphone service from the background; open Boba once to restart it.
             stopSelf()
             return
         }
@@ -102,7 +102,7 @@ class WakeWordService : Service(), RecognitionListener {
         super.onDestroy()
     }
 
-    /** If Nova was triggered but never came back (e.g. screen was locked), start listening again. */
+    /** If Boba was triggered but never came back (e.g. screen was locked), start listening again. */
     private val watchdog = object : Runnable {
         override fun run() {
             if (paused && !conversationActive && System.currentTimeMillis() - lastTrigger > 20_000) resumeListening()
@@ -119,7 +119,7 @@ class WakeWordService : Service(), RecognitionListener {
             model = Model(dir.absolutePath)
             main.post { if (!conversationActive) resumeListening() else paused = true }
         } catch (e: Exception) {
-            update("Couldn't load the voice model: ${e.message}. Check internet and toggle Hey Nova again.")
+            update("Couldn't load the voice model: ${e.message}. Check internet and toggle Hey Boba again.")
         }
     }
 
@@ -187,7 +187,7 @@ class WakeWordService : Service(), RecognitionListener {
         try {
             val rec = Recognizer(m, 16000f)
             speech = SpeechService(rec, 16000f).also { it.startListening(this) }
-            update("Say \"Hey Nova\"")
+            update("Say \"Hey Boba\"")
         } catch (e: Exception) {
             speech = null
             update("Mic busy, retrying…")
@@ -228,7 +228,7 @@ class WakeWordService : Service(), RecognitionListener {
             launcher.startActivity(i)
         } catch (e: Exception) {
             conversationActive = false
-            update("Turn on phone control or make Nova the default assistant so I can pop up from anywhere.")
+            update("Turn on phone control or make Boba the default assistant so I can pop up from anywhere.")
         }
     }
 
@@ -255,7 +255,7 @@ class WakeWordService : Service(), RecognitionListener {
         )
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle("Nova")
+            .setContentTitle("Boba")
             .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)

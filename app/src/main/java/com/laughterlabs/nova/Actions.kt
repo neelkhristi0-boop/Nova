@@ -21,7 +21,7 @@ import java.util.Locale
 
 data class Contact(val name: String, val number: String)
 
-/** Every concrete thing Nova can do on the phone. Each returns the sentence Nova speaks. */
+/** Every concrete thing Boba can do on the phone. Each returns the sentence Boba speaks. */
 object Actions {
 
     private fun Context.go(i: Intent) = startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -108,7 +108,7 @@ object Actions {
 
     fun resolveContact(ctx: Context, spoken: String): Contact {
         findContact(ctx, spoken)?.let { return it }
-        if (!ctx.has(Manifest.permission.READ_CONTACTS)) throw NovaException("I need contacts permission. Reopen Nova and allow it.")
+        if (!ctx.has(Manifest.permission.READ_CONTACTS)) throw NovaException("I need contacts permission. Reopen Boba and allow it.")
         throw NovaException("I couldn't find $spoken in your contacts.")
     }
 
@@ -124,7 +124,7 @@ object Actions {
     }
 
     fun sendSms(ctx: Context, c: Contact, msg: String): String {
-        if (!ctx.has(Manifest.permission.SEND_SMS)) throw NovaException("I need SMS permission. Reopen Nova and allow it.")
+        if (!ctx.has(Manifest.permission.SEND_SMS)) throw NovaException("I need SMS permission. Reopen Boba and allow it.")
         val sms: SmsManager = if (Build.VERSION.SDK_INT >= 31) ctx.getSystemService(SmsManager::class.java)
         else @Suppress("DEPRECATION") SmsManager.getDefault()
         sms.sendMultipartTextMessage(c.number, null, sms.divideMessage(msg), null, null)
@@ -209,7 +209,7 @@ object Actions {
             Intent(AlarmClock.ACTION_SET_ALARM)
                 .putExtra(AlarmClock.EXTRA_HOUR, h)
                 .putExtra(AlarmClock.EXTRA_MINUTES, min)
-                .putExtra(AlarmClock.EXTRA_MESSAGE, "Nova")
+                .putExtra(AlarmClock.EXTRA_MESSAGE, "Boba")
                 .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
         )
         val h12 = if (h % 12 == 0) 12 else h % 12
@@ -226,7 +226,7 @@ object Actions {
         ctx.go(
             Intent(AlarmClock.ACTION_SET_TIMER)
                 .putExtra(AlarmClock.EXTRA_LENGTH, secs)
-                .putExtra(AlarmClock.EXTRA_MESSAGE, "Nova")
+                .putExtra(AlarmClock.EXTRA_MESSAGE, "Boba")
                 .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
         )
         return "Timer started."
@@ -269,7 +269,7 @@ object Actions {
         return "Battery is at $pct percent" + if (bm.isCharging) " and charging." else "."
     }
 
-    /** Android 10+ doesn't let apps flip Wi-Fi directly, so Nova pops the system toggle panel. */
+    /** Android 10+ doesn't let apps flip Wi-Fi directly, so Boba pops the system toggle panel. */
     fun panel(ctx: Context, which: String): String {
         val i = when (which) {
             "wifi" -> if (Build.VERSION.SDK_INT >= 29) Intent(Settings.Panel.ACTION_WIFI) else Intent(Settings.ACTION_WIFI_SETTINGS)

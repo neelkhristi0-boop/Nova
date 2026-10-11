@@ -10,8 +10,8 @@ import android.speech.RecognitionService
 import android.speech.SpeechRecognizer
 
 /**
- * Makes Nova selectable as the phone's "Default digital assistant", like Gemini.
- * Then long-pressing power (or swiping up from a bottom corner) opens Nova over any app.
+ * Makes Boba selectable as the phone's "Default digital assistant", like Gemini.
+ * Then long-pressing power (or swiping up from a bottom corner) opens Boba over any app.
  */
 class NovaVoiceInteractionService : VoiceInteractionService() {
     companion object {
@@ -46,7 +46,7 @@ class NovaSession(context: Context) : VoiceInteractionSession(context) {
 }
 
 /**
- * Android requires every assistant to declare a speech recognizer. Nova actually uses Google's
+ * Android requires every assistant to declare a speech recognizer. Boba actually uses Google's
  * recognizer (picked by name in MainActivity), so this one just politely declines.
  */
 class NovaRecognitionService : RecognitionService() {

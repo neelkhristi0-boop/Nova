@@ -11,7 +11,9 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognitionService
@@ -31,8 +33,8 @@ import android.widget.TextView
 import java.util.Locale
 
 /**
- * Nova's face. Works like Gemini:
- *  - "Hey Nova" from anywhere (WakeWordService), or long-press power (default assistant)
+ * Boba's face. Works like Gemini:
+ *  - "Hey Boba" from anywhere (WakeWordService), or long-press power (default assistant)
  *  - it listens straight away, answers, and keeps listening until you stop talking or say "bye".
  */
 class MainActivity : Activity() {
@@ -52,8 +54,12 @@ class MainActivity : Activity() {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var utteranceId = 0
+    /** How many times in a row the mic failed to start (busy / audio error). */
+    private var micRetries = 0
+    /** Some phones' speech engines reject "en-IN"; then we just use the phone's default language. */
+    private var useIndianEnglish = true
 
-    /** True while we're in a back-and-forth conversation (Nova re-listens after each answer). */
+    /** True while we're in a back-and-forth conversation (Boba re-listens after each answer). */
     private var inConversation = false
     private var endAfterReply = false
     private var foreground = false
@@ -89,7 +95,7 @@ class MainActivity : Activity() {
         askPermissions()
         NovaNotification.show(this)
         if (Prefs.wakeEnabled(this) && hasMic()) WakeWordService.start(this)
-        addLog("Nova", "Online. Say \"Hey Nova\", tap the mic, or type. Say \"help\" for what I can do.")
+        addLog("Boba", "Online. Say \"Hey Boba\", tap the mic, or type. Say \"help\" for what I can do.")
         handleIntent(intent)
     }
 
@@ -126,7 +132,7 @@ class MainActivity : Activity() {
 
     // ---------------- Conversation flow ----------------
 
-    /** Called when Nova finishes speaking. Decides whether to keep listening (like Gemini Live). */
+    /** Called when Boba finishes speaking. Decides whether to keep listening (like Gemini Live). */
     private fun afterReply() {
         when {
             engine.awaitingConfirm -> startListening()
@@ -140,7 +146,7 @@ class MainActivity : Activity() {
         inConversation = false
         WakeWordService.conversationActive = false
         WakeWordService.send(this, WakeWordService.ACTION_RESUME)
-        status.text = if (WakeWordService.running) "Say \"Hey Nova\" or tap the mic." else "Tap the mic and speak."
+        status.text = if (WakeWordService.running) "Say \"Hey Boba\" or tap the mic." else "Tap the mic and speak."
     }
 
     // ---------------- Voice ----------------
@@ -148,8 +154,8 @@ class MainActivity : Activity() {
     private fun hasMic() = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     /**
-     * Use Google's speech engine explicitly. When Nova is the default assistant, Android points
-     * the "default recognizer" at Nova itself, so we must pick the real one by name.
+     * Use Google's speech engine explicitly. When Boba is the default assistant, Android points
+     * the "default recognizer" at Boba itself, so we must pick the real one by name.
      */
     private fun recognizerComponent(): ComponentName? {
         val all = packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
@@ -179,14 +185,19 @@ class MainActivity : Activity() {
         rec.setRecognitionListener(listener)
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+            if (useIndianEnglish) putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
         listening = true
         setMicActive(true)
         status.text = "Listening…"
-        mic.postDelayed({ if (listening) rec.startListening(intent) }, if (WakeWordService.running) 250L else 0L)
+        mic.postDelayed({ if (listening) rec.startListening(intent) }, if (WakeWordService.running) 700L else 0L)
+    }
+
+    private fun resetRecognizer() {
+        try { recognizer?.destroy() } catch (e: Exception) {}
+        recognizer = null
     }
 
     private fun stopListening() {
@@ -208,10 +219,21 @@ class MainActivity : Activity() {
         override fun onError(error: Int) {
             listening = false
             setMicActive(false)
+            // A recognizer that hit an error often stays broken ("mic does nothing" on the next tap).
+            // Throw it away so the next attempt starts fresh.
+            resetRecognizer()
             when (error) {
                 // Silence = conversation over (Gemini does the same).
                 SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> endConversation()
-                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> mic.postDelayed({ startListening() }, 400)
+                // Mic still held by the "Hey Boba" listener or another app: wait and try again (twice).
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_AUDIO, SpeechRecognizer.ERROR_CLIENT -> {
+                    if (micRetries++ < 2) mic.postDelayed({ startListening() }, 800)
+                    else { micRetries = 0; endConversation(); status.text = "Mic is busy. Tap the mic to try again." }
+                }
+                SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> {
+                    if (useIndianEnglish) { useIndianEnglish = false; mic.postDelayed({ startListening() }, 300) }
+                    else endConversation()
+                }
                 SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> {
                     endConversation(); status.text = "Network issue. Try again."
                 }
@@ -223,6 +245,7 @@ class MainActivity : Activity() {
         }
         override fun onResults(results: Bundle?) {
             listening = false
+            micRetries = 0
             setMicActive(false)
             val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
             if (text.isNullOrBlank()) { endConversation(); return }
@@ -247,7 +270,7 @@ class MainActivity : Activity() {
     }
 
     private fun speak(text: String) {
-        addLog("Nova", text)
+        addLog("Boba", text)
         if (ttsReady) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "u${utteranceId++}")
         else afterReply()
     }
@@ -265,7 +288,7 @@ class MainActivity : Activity() {
         }
 
         root.addView(TextView(this).apply {
-            text = "N O V A"
+            text = "B O B A"
             setTextColor(cyan)
             textSize = 28f
             typeface = Typeface.DEFAULT_BOLD
@@ -330,7 +353,7 @@ class MainActivity : Activity() {
 
         val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         controlBtn = Button(this).apply {
-            setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            setOnClickListener { openPhoneControlSettings() }
         }
         row2.addView(controlBtn, half())
         row2.addView(Button(this).apply { text = "AI brain"; setOnClickListener { showAiKeyDialog() } }, half())
@@ -341,7 +364,7 @@ class MainActivity : Activity() {
 
     private fun refreshButtons() {
         controlBtn.text = if (NovaAccessibilityService.instance != null) "Phone control: ON" else "Turn on phone control"
-        wakeBtn.text = if (Prefs.wakeEnabled(this)) "\"Hey Nova\": ON" else "\"Hey Nova\": OFF"
+        wakeBtn.text = if (Prefs.wakeEnabled(this)) "\"Hey Boba\": ON" else "\"Hey Boba\": OFF"
         assistantBtn.text = if (isDefaultAssistant()) "Default assistant ✓" else "Make default assistant"
     }
 
@@ -350,13 +373,45 @@ class MainActivity : Activity() {
         if (on && !hasMic()) { askPermissions(); return }
         Prefs.setWakeEnabled(this, on)
         if (on) {
+            askBatteryExemption()
             WakeWordService.start(this)
-            addLog("Nova", "Hands-free on. First time, I download a small offline voice model (about 36 MB), then just say \"Hey Nova\" from anywhere.")
+            addLog("Boba", "Hands-free on. First time, I download a small offline voice model (about 36 MB), then just say \"Hey Boba\" from anywhere.")
         } else {
             WakeWordService.stop(this)
-            addLog("Nova", "Hands-free off.")
+            addLog("Boba", "Hands-free off.")
         }
         refreshButtons()
+    }
+
+    /**
+     * Android 13+ blocks phone control for apps installed from an APK ("Restricted setting").
+     * The fix is in Boba's App info page: ⋮ menu → "Allow restricted settings". We explain that first.
+     */
+    private fun openPhoneControlSettings() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            AlertDialog.Builder(this)
+                .setTitle("Turn on phone control")
+                .setMessage("1. Tap Accessibility below → Installed apps → Boba → switch On.\n\n" +
+                    "If the switch is greyed out or says \"Restricted setting\": tap App info below, " +
+                    "then the ⋮ menu (top right) → \"Allow restricted settings\", then come back and try step 1 again.")
+                .setPositiveButton("Accessibility") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                .setNeutralButton("App info") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+                }
+                .show()
+        } else {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    }
+
+    /** Stops the phone from killing the "Hey Boba" listener to save battery (big issue on Xiaomi/Vivo/Oppo/Realme). */
+    private fun askBatteryExemption() {
+        val pm = getSystemService(PowerManager::class.java)
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        try {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+            addLog("Boba", "Tap Allow so your phone doesn't switch off \"Hey Boba\" in the background.")
+        } catch (e: Exception) {}
     }
 
     private fun isDefaultAssistant(): Boolean {
@@ -365,7 +420,7 @@ class MainActivity : Activity() {
     }
 
     private fun openAssistantSettings() {
-        addLog("Nova", "In the screen that opens choose: Default digital assistant app → Nova. Then long-press the power button (or swipe up from a bottom corner) to call me from any app.")
+        addLog("Boba", "In the screen that opens choose: Default digital assistant app → Boba. Then long-press the power button (or swipe up from a bottom corner) to call me from any app.")
         try {
             startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
         } catch (e: ActivityNotFoundException) {
@@ -422,7 +477,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        recognizer?.destroy()
+        resetRecognizer()
         tts.shutdown()
         super.onDestroy()
     }
